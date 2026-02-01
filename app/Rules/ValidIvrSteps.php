@@ -29,7 +29,7 @@ class ValidIvrSteps implements ValidationRule
                 continue;
             }
 
-            if (empty($step['digit']) || !is_string($step['digit']) || strlen($step['digit']) > 1) {
+            if (is_null($step['digit'])) {
                 $fail("$stepPath.digit is required.");
             }
 
