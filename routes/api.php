@@ -1,10 +1,10 @@
 <?php
 
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\LanguageController;
-use App\Http\Controllers\LineController;
-use App\Http\Controllers\SkillController;
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\LanguageController;
+use App\Http\Controllers\Api\LineController;
+use App\Http\Controllers\Api\SkillController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
