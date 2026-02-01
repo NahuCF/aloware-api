@@ -4,9 +4,8 @@ namespace App\Http\Requests;
 
 use App\Rules\ValidIvrSteps;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class UpdateLineRequest extends FormRequest
+class StoreLineRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,8 +15,8 @@ class UpdateLineRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['sometimes', 'string', 'max:255'],
-            'phone_number' => ['sometimes', 'string', Rule::unique('lines')->ignore($this->route('line'))],
+            'name' => ['required', 'string', 'max:255'],
+            'phone_number' => ['required', 'string', 'unique:lines,phone_number'],
             'ivr_steps' => ['nullable', new ValidIvrSteps],
         ];
     }
