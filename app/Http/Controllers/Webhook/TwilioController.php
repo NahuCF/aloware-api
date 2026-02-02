@@ -6,6 +6,7 @@ use App\Enums\CallSessionStatus;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\CallSession;
+use App\Models\Language;
 use App\Models\Line;
 use App\Models\Skill;
 use App\Models\User;
@@ -14,7 +15,14 @@ use Twilio\TwiML\VoiceResponse;
 
 class TwilioController extends Controller
 {
-    public function incoming(Request $request)
+    private const DEFAULT_LANGUAGE = 'en';
+
+    private const TWILIO_VOICES = [
+        'en' => 'Polly.Joanna',
+        'es' => 'Polly.Lupe',
+    ];
+
+    public function incoming(Request $request): \Illuminate\Http\Response
     {
         $input = $request->all();
         $callSid = data_get($input, 'CallSid');
@@ -24,11 +32,11 @@ class TwilioController extends Controller
         $line = Line::where('phone_number', $to)->first();
 
         if (! $line) {
-            return $this->errorResponse('Invalid number');
+            return $this->errorResponse(__('ivr.error.invalid_number'));
         }
 
         if (empty($line->ivr_steps)) {
-            return $this->errorResponse('There is no IVR configured for this line');
+            return $this->errorResponse(__('ivr.error.no_ivr'));
         }
 
         $session = CallSession::create([
@@ -42,7 +50,7 @@ class TwilioController extends Controller
         return $this->playMenu($session, $line->ivr_steps);
     }
 
-    public function handleInput(Request $request)
+    public function handleInput(Request $request): \Illuminate\Http\Response
     {
         $input = $request->all();
         $sessionId = data_get($input, 'session_id');
@@ -51,13 +59,13 @@ class TwilioController extends Controller
         $session = CallSession::find($sessionId);
 
         if (! $session) {
-            return $this->errorResponse('Session not found');
+            return $this->errorResponse(__('ivr.error.session_not_found'));
         }
 
         $line = $session->line;
 
         if (! $line) {
-            return $this->errorResponse('Line not found');
+            return $this->errorResponse(__('ivr.error.line_not_found'));
         }
 
         $currentSteps = $this->getStepsAtPath($line->ivr_steps, $session->path);
@@ -76,21 +84,28 @@ class TwilioController extends Controller
             'context' => $newContext,
         ]);
 
+        $session->refresh();
+
         return match ($step['action_type']) {
             'menu' => $this->playMenu($session, $step['sub_steps'] ?? []),
             'route_to_skill' => $this->routeToSkill($session),
             'route_to_user' => $this->routeToUser($session, $step['target_id']),
             'route_to_line' => $this->routeToLine($session, $step['target_id']),
-            default => $this->errorResponse('The action does not exists'),
+            default => $this->errorResponse($this->trans($session, 'ivr.error.invalid_action')),
         };
     }
 
     private function playMenu(CallSession $session, array $steps): \Illuminate\Http\Response
     {
         $response = new VoiceResponse;
+        $voice = $this->getVoice($session);
+        $lang = $this->getLanguageCode($session);
 
         if (empty($session->path)) {
-            $response->say('Welcome to '.config('app.name'));
+            $response->say(
+                $this->trans($session, 'ivr.welcome', ['app_name' => config('app.name')]),
+                ['voice' => $voice]
+            );
         }
 
         $handleInputUrl = '/webhook/twilio/voice/handle-input?session_id='.$session->id;
@@ -103,7 +118,7 @@ class TwilioController extends Controller
         ]);
 
         foreach ($steps as $step) {
-            $this->playStepPrompt($gather, $step);
+            $this->playStepPrompt($gather, $step, $lang, $voice);
         }
 
         $response->redirect($handleInputUrl, ['method' => 'POST']);
@@ -170,14 +185,19 @@ class TwilioController extends Controller
         $user = User::find($userId);
 
         if (! $user) {
-            return $this->errorResponse('The requested agent is not available.');
+            return $this->errorResponse($this->trans($session, 'ivr.error.agent_not_found'));
         }
 
-        $response = new VoiceResponse;
+        if ($user->status !== UserStatus::Available) {
+            return $this->agentUnavailableResponse($session, $user);
+        }
+
+        $user->update(['status' => UserStatus::OnCall]);
 
         $session->update(['status' => CallSessionStatus::Connected]);
 
-        $response->say('Connecting you to agent.');
+        $response = new VoiceResponse;
+        $response->say($this->trans($session, 'ivr.connecting_to_agent'), ['voice' => $this->getVoice($session)]);
 
         $dial = $response->dial(null, [
             'callerId' => $session->line->phone_number,
@@ -190,16 +210,35 @@ class TwilioController extends Controller
         return $this->twimlResponse($response);
     }
 
+    private function agentUnavailableResponse(CallSession $session, User $user): \Illuminate\Http\Response
+    {
+        $response = new VoiceResponse;
+        $voice = $this->getVoice($session);
+
+        $messageKey = match ($user->status) {
+            UserStatus::OnCall => 'ivr.agent_status.on_call',
+            UserStatus::Away => 'ivr.agent_status.away',
+            UserStatus::Offline => 'ivr.agent_status.offline',
+            default => 'ivr.agent_status.unavailable',
+        };
+
+        $response->say($this->trans($session, $messageKey), ['voice' => $voice]);
+        $response->say($this->trans($session, 'ivr.please_try_again'), ['voice' => $voice]);
+        $response->hangup();
+
+        return $this->twimlResponse($response);
+    }
+
     private function routeToLine(CallSession $session, int $lineId): \Illuminate\Http\Response
     {
         $line = Line::find($lineId);
 
         if (! $line) {
-            return $this->errorResponse('Transfer failed.');
+            return $this->errorResponse($this->trans($session, 'ivr.error.transfer_failed'));
         }
 
         if (empty($line->ivr_steps)) {
-            return $this->errorResponse('The destination line has no IVR configured.');
+            return $this->errorResponse($this->trans($session, 'ivr.error.destination_no_ivr'));
         }
 
         $session->update(['status' => CallSessionStatus::Transferred]);
@@ -209,16 +248,16 @@ class TwilioController extends Controller
             'line_id' => $line->id,
             'from_number' => $session->from_number,
             'path' => [],
-            'context' => [],
+            'context' => $session->context,
         ]);
 
         $response = new VoiceResponse;
-        $response->say('Transferring your call.');
+        $response->say($this->trans($session, 'ivr.transferring_call'), ['voice' => $this->getVoice($session)]);
 
         return $this->playMenu($newSession, $line->ivr_steps);
     }
 
-    public function outbound(Request $request)
+    public function outbound(Request $request): \Illuminate\Http\Response
     {
         $input = $request->all();
         $to = data_get($input, 'To');
@@ -226,7 +265,7 @@ class TwilioController extends Controller
         $response = new VoiceResponse;
 
         if (! $to) {
-            $response->say('No destination number provided.');
+            $response->say(__('ivr.no_destination'));
             $response->hangup();
 
             return $this->twimlResponse($response);
@@ -242,7 +281,7 @@ class TwilioController extends Controller
         return $this->twimlResponse($response);
     }
 
-    public function dialComplete(Request $request)
+    public function dialComplete(Request $request): \Illuminate\Http\Response
     {
         $input = $request->all();
         $sessionId = data_get($input, 'session_id');
@@ -256,12 +295,18 @@ class TwilioController extends Controller
             ]);
         }
 
+        $session = CallSession::find($sessionId);
+
         CallSession::where('id', $sessionId)->update(['status' => CallSessionStatus::Completed]);
 
         $response = new VoiceResponse;
 
         if ($status !== 'completed') {
-            $response->say('Agent could not pick up your call.');
+            $voice = $session ? $this->getVoice($session) : self::TWILIO_VOICES[self::DEFAULT_LANGUAGE];
+            $message = $session
+                ? $this->trans($session, 'ivr.agent_no_answer')
+                : __('ivr.agent_no_answer');
+            $response->say($message, ['voice' => $voice]);
         }
 
         $response->hangup();
@@ -269,9 +314,37 @@ class TwilioController extends Controller
         return $this->twimlResponse($response);
     }
 
-    private function playStepPrompt($gather, array $step): void
+    private function playStepPrompt($gather, array $step, string $lang, string $voice): void
     {
-        $gather->say('Press '.$step['digit'].' for '.$step['label'], ['voice' => 'Polly.Joanna']);
+        $message = __('ivr.press_for', ['digit' => $step['digit'], 'label' => $step['label']], $lang);
+        $gather->say($message, ['voice' => $voice]);
+    }
+
+    private function getLanguageCode(CallSession $session): string
+    {
+        $languageId = data_get($session->context, 'language_id');
+
+        if (! $languageId) {
+            return self::DEFAULT_LANGUAGE;
+        }
+
+        $language = Language::find($languageId);
+
+        return $language?->code ?? self::DEFAULT_LANGUAGE;
+    }
+
+    private function getVoice(CallSession $session): string
+    {
+        $lang = $this->getLanguageCode($session);
+
+        return self::TWILIO_VOICES[$lang] ?? self::TWILIO_VOICES[self::DEFAULT_LANGUAGE];
+    }
+
+    private function trans(CallSession $session, string $key, array $replace = []): string
+    {
+        $lang = $this->getLanguageCode($session);
+
+        return __($key, $replace, $lang);
     }
 
     private function twimlResponse(VoiceResponse $response): \Illuminate\Http\Response
@@ -280,10 +353,10 @@ class TwilioController extends Controller
             ->header('Content-Type', 'text/xml');
     }
 
-    private function errorResponse(string $message): \Illuminate\Http\Response
+    private function errorResponse(string $message, ?string $voice = null): \Illuminate\Http\Response
     {
         $response = new VoiceResponse;
-        $response->say($message);
+        $response->say($message, ['voice' => $voice ?? self::TWILIO_VOICES[self::DEFAULT_LANGUAGE]]);
         $response->hangup();
 
         return $this->twimlResponse($response);
