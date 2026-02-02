@@ -11,6 +11,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Language;
 use App\Models\Skill;
 use App\Models\User;
+use App\Services\WorkerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -36,6 +37,9 @@ class AuthController extends Controller
 
         $user->languages()->sync($languageIds);
         $user->skills()->sync($skillIds);
+
+        $workerService = new WorkerService();
+        $workerService->createWorker($user);
 
         $token = $user->createToken('auth-token')->plainTextToken;
 

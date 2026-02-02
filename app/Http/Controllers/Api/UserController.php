@@ -2,17 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
-
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Language;
 use App\Models\Skill;
 use App\Models\User;
+use App\Services\WorkerService;
 
 class UserController extends Controller
 {
+    public function __construct(private WorkerService $workerService)
+    {
+    }
+
     public function index()
     {
         $users = User::with(['languages', 'skills'])->paginate();
@@ -33,7 +38,7 @@ class UserController extends Controller
         $password = data_get($input, 'password');
         $role = data_get($input, 'role', 'agent');
         $department = data_get($input, 'department');
-        $status = data_get($input, 'status', 'offline');
+        $status = data_get($input, 'status', UserStatus::Available->value);
         $languageIds = data_get($input, 'language_ids') ?? Language::pluck('id')->toArray();
         $skillIds = data_get($input, 'skill_ids') ?? Skill::pluck('id')->toArray();
 
@@ -49,6 +54,8 @@ class UserController extends Controller
         $user->languages()->sync($languageIds);
         $user->skills()->sync($skillIds);
 
+        $this->workerService->createWorker($user);
+
         return new UserResource($user->load(['languages', 'skills']));
     }
 
@@ -58,7 +65,7 @@ class UserController extends Controller
         $languageIds = data_get($input, 'language_ids');
         $skillIds = data_get($input, 'skill_ids');
 
-        $user->update($input);
+        $user->update(collect($input)->except(['language_ids', 'skill_ids'])->toArray());
 
         if ($languageIds) {
             $user->languages()->sync($languageIds);
@@ -68,11 +75,15 @@ class UserController extends Controller
             $user->skills()->sync($skillIds);
         }
 
+        $this->workerService->updateWorker($user);
+
         return new UserResource($user->fresh(['languages', 'skills']));
     }
 
     public function destroy(User $user)
     {
+        $this->workerService->deleteWorker($user);
+
         $user->delete();
 
         return response()->noContent();

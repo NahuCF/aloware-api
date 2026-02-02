@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('role')->default(UserRole::Agent->value);
             $table->string('department')->nullable();
             $table->string('status')->nullable();
+            $table->string('worker_sid')->nullable();
             $table->timestamp('last_activity_at')->nullable();
             $table->rememberToken();
             $table->timestamps();

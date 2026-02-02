@@ -7,6 +7,7 @@ use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\CallSession;
 use App\Models\Line;
+use App\Models\Skill;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Twilio\TwiML\VoiceResponse;
@@ -143,44 +144,23 @@ class TwilioController extends Controller
     private function routeToSkill(CallSession $session): \Illuminate\Http\Response
     {
         $context = $session->context;
-        $languageId = $context['language_id'] ?? null;
         $skillIds = $context['skill_ids'] ?? [];
-
-        $query = User::where('status', UserStatus::Available);
-
-        if ($languageId) {
-            $query->whereHas('languages', function ($q) use ($languageId) {
-                $q->where('languages.id', $languageId);
-            });
-        }
-
-        if (!empty($skillIds)) {
-            $query->whereHas('skills', function ($q) use ($skillIds) {
-                $q->whereIn('skills.id', $skillIds);
-            }, '=', count($skillIds));
-        }
-
-        $user = $query->orderBy('last_activity_at', 'asc')->first();
+        $skillNames = Skill::whereIn('id', $skillIds)->pluck('name')->toArray();
 
         $response = new VoiceResponse();
 
-        if (!$user) {
-            return $this->errorResponse('No agents available');
-        }
-
-
-        $user->update(['status' => UserStatus::OnCall]);
-        $session->update(['status' => CallSessionStatus::Connected]);
-
-        $response->say('Connecting you with ' . $user->name);
-
-        $dial = $response->dial(null, [
-            'callerId' => $session->line->phone_number,
-            'timeout' => 30,
-            'action' => '/webhook/twilio/voice/dial-complete?session_id=' . $session->id . '&user_id=' . $user->id,
+        $enqueue = $response->enqueue(null, [
+            'workflowSid' => config('services.twilio.workflow_sid'),
+            'waitUrl' => 'http://twimlets.com/holdmusic?Bucket=com.twilio.music.soft-rock',
         ]);
 
-        $dial->client('agent_' . $user->id);
+        $enqueue->task(json_encode([
+            'session_id' => $session->id,
+            'call_sid' => $session->call_sid,
+            'from' => $session->from_number,
+            'language' => $context['language_id'] ?? null,
+            'skills' => $skillNames,
+        ]));
 
         return $this->twimlResponse($response);
     }
