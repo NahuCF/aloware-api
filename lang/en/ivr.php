@@ -12,8 +12,6 @@ return [
     'error' => [
         'invalid_number' => 'The number you called is not valid.',
         'no_ivr' => 'There is no menu configured for this line.',
-        'session_not_found' => 'We could not find your call session.',
-        'line_not_found' => 'The line could not be found.',
         'invalid_action' => 'Invalid menu option.',
         'agent_not_found' => 'The requested agent does not exist.',
         'transfer_failed' => 'The transfer could not be completed.',
@@ -25,5 +23,10 @@ return [
         'away' => 'The requested agent is currently away.',
         'offline' => 'The requested agent is currently offline.',
         'unavailable' => 'The requested agent is not available.',
+    ],
+
+    'queue' => [
+        'no_agents' => 'All of our agents are currently busy.',
+        'error' => 'We are experiencing technical difficulties.',
     ],
 ];

@@ -57,18 +57,7 @@ class TwilioController extends Controller
         $digit = data_get($input, 'Digits');
 
         $session = CallSession::find($sessionId);
-
-        if (! $session) {
-            return $this->errorResponse(__('ivr.error.session_not_found'));
-        }
-
-        $line = $session->line;
-
-        if (! $line) {
-            return $this->errorResponse(__('ivr.error.line_not_found'));
-        }
-
-        $currentSteps = $this->getStepsAtPath($line->ivr_steps, $session->path);
+        $currentSteps = $this->getStepsAtPath($session->line->ivr_steps, $session->path);
 
         $step = collect($currentSteps)->firstWhere('digit', $digit);
 
@@ -108,7 +97,7 @@ class TwilioController extends Controller
             );
         }
 
-        $handleInputUrl = '/webhook/twilio/voice/handle-input?session_id='.$session->id;
+        $handleInputUrl = route('twilio.voice.handle-input', ['session_id' => $session->id]);
 
         $gather = $response->gather([
             'numDigits' => 1,
@@ -167,6 +156,8 @@ class TwilioController extends Controller
         $enqueue = $response->enqueue(null, [
             'workflowSid' => config('services.twilio.workflow_sid'),
             'waitUrl' => config('services.twilio.ivr.hold_music_url'),
+            'action' => route('twilio.voice.queue-status', ['session_id' => $session->id]),
+            'method' => 'POST',
         ]);
 
         $enqueue->task(json_encode([
@@ -176,6 +167,51 @@ class TwilioController extends Controller
             'language' => $context['language_id'] ?? null,
             'skills' => $skillNames,
         ]));
+
+        return $this->twimlResponse($response);
+    }
+
+    public function queueStatus(Request $request): \Illuminate\Http\Response
+    {
+        $input = $request->all();
+        $sessionId = data_get($input, 'session_id');
+        $queueResult = data_get($input, 'QueueResult');
+
+        $session = CallSession::find($sessionId);
+        $response = new VoiceResponse;
+        $voice = $this->getVoice($session);
+
+        if ($queueResult === 'bridged') {
+            $session->update(['status' => CallSessionStatus::Connected]);
+            $response->hangup();
+
+            return $this->twimlResponse($response);
+        }
+
+        if (in_array($queueResult, ['queue-full', 'error', 'system-error'])) {
+            $session->update(['status' => CallSessionStatus::Completed]);
+            $response->say($this->trans($session, 'ivr.queue.error'), ['voice' => $voice]);
+            $response->hangup();
+
+            return $this->twimlResponse($response);
+        }
+
+        if ($queueResult === 'hangup') {
+            $session->update(['status' => CallSessionStatus::Completed]);
+
+            return $this->twimlResponse($response);
+        }
+
+        if (in_array($queueResult, ['leave', 'timeout'])) {
+            $session->update(['status' => CallSessionStatus::Completed]);
+            $response->say($this->trans($session, 'ivr.queue.no_agents'), ['voice' => $voice]);
+            $response->say($this->trans($session, 'ivr.please_try_again'), ['voice' => $voice]);
+            $response->hangup();
+
+            return $this->twimlResponse($response);
+        }
+
+        $response->hangup();
 
         return $this->twimlResponse($response);
     }
@@ -202,7 +238,7 @@ class TwilioController extends Controller
         $dial = $response->dial(null, [
             'callerId' => $session->line->phone_number,
             'timeout' => config('services.twilio.ivr.dial_timeout'),
-            'action' => '/webhook/twilio/voice/dial-complete?session_id='.$session->id.'&user_id='.$user->id,
+            'action' => route('twilio.voice.dial-complete', ['session_id' => $session->id, 'user_id' => $user->id]),
         ]);
 
         $dial->client('agent_'.$user->id);
@@ -288,25 +324,18 @@ class TwilioController extends Controller
         $status = data_get($input, 'DialCallStatus');
         $userId = data_get($input, 'user_id');
 
-        if ($userId) {
-            User::where('id', $userId)->update([
-                'status' => UserStatus::Available,
-                'last_activity_at' => now(),
-            ]);
-        }
+        User::where('id', $userId)->update([
+            'status' => UserStatus::Available,
+            'last_activity_at' => now(),
+        ]);
 
         $session = CallSession::find($sessionId);
-
-        CallSession::where('id', $sessionId)->update(['status' => CallSessionStatus::Completed]);
+        $session->update(['status' => CallSessionStatus::Completed]);
 
         $response = new VoiceResponse;
 
         if ($status !== 'completed') {
-            $voice = $session ? $this->getVoice($session) : self::TWILIO_VOICES[self::DEFAULT_LANGUAGE];
-            $message = $session
-                ? $this->trans($session, 'ivr.agent_no_answer')
-                : __('ivr.agent_no_answer');
-            $response->say($message, ['voice' => $voice]);
+            $response->say($this->trans($session, 'ivr.agent_no_answer'), ['voice' => $this->getVoice($session)]);
         }
 
         $response->hangup();
