@@ -11,8 +11,9 @@ class ValidIvrSteps implements ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         // Just in case
-        if (!is_array($value)) {
+        if (! is_array($value)) {
             $fail('The :attribute must be an array.');
+
             return;
         }
 
@@ -24,8 +25,9 @@ class ValidIvrSteps implements ValidationRule
         foreach ($steps as $index => $step) {
             $stepPath = "$path.$index";
 
-            if (!is_array($step)) {
+            if (! is_array($step)) {
                 $fail("$stepPath must be an array.");
+
                 continue;
             }
 
@@ -35,24 +37,24 @@ class ValidIvrSteps implements ValidationRule
 
             if (empty($step['action_type'])) {
                 $fail("$stepPath.action_type is required.");
-            } elseif (!IvrActionType::tryFrom($step['action_type'])) {
+            } elseif (! IvrActionType::tryFrom($step['action_type'])) {
                 $fail("$stepPath.action_type is invalid.");
             }
 
-            if (isset($step['label']) && (!is_string($step['label']) || strlen($step['label']) > 255)) {
+            if (isset($step['label']) && (! is_string($step['label']) || strlen($step['label']) > 255)) {
                 $fail("$stepPath.label must be a string with max 255 characters.");
             }
 
-            if (isset($step['target_id']) && !is_null($step['target_id']) && !is_int($step['target_id'])) {
+            if (isset($step['target_id']) && ! is_null($step['target_id']) && ! is_int($step['target_id'])) {
                 $fail("$stepPath.target_id must be an integer.");
             }
 
-            if (isset($step['context']) && !is_array($step['context'])) {
+            if (isset($step['context']) && ! is_array($step['context'])) {
                 $fail("$stepPath.context must be an array.");
             }
 
-            if (!empty($step['sub_steps'])) {
-                if (!is_array($step['sub_steps'])) {
+            if (! empty($step['sub_steps'])) {
+                if (! is_array($step['sub_steps'])) {
                     $fail("$stepPath.sub_steps must be an array.");
                 } else {
                     $this->validateSteps($step['sub_steps'], $fail, "$stepPath.sub_steps");

@@ -9,9 +9,11 @@ use Twilio\Rest\Client;
 class SetupTaskRouter extends Command
 {
     protected $signature = 'taskrouter:setup';
+
     protected $description = 'Create TaskRouter queues and workflow';
 
     private Client $client;
+
     private string $workspaceSid;
 
     public function handle(): int
@@ -67,7 +69,7 @@ class SetupTaskRouter extends Command
             ->taskQueues
             ->read(['friendlyName' => 'Default'], 1);
 
-        if (!empty($existingQueues)) {
+        if (! empty($existingQueues)) {
             return $existingQueues[0]->sid;
         }
 
@@ -85,7 +87,7 @@ class SetupTaskRouter extends Command
     {
         $skills = Skill::whereNotNull('queue_sid')->get();
 
-        $filters = $skills->map(fn($skill) => [
+        $filters = $skills->map(fn ($skill) => [
             'filter_friendly_name' => $skill->name,
             'expression' => "'{$skill->name}' IN task.skills",
             'targets' => [
@@ -117,7 +119,7 @@ class SetupTaskRouter extends Command
             ->workspaces($this->workspaceSid)
             ->workflows
             ->create('Main Routing', json_encode($configuration), [
-                'assignmentCallbackUrl' => config('app.url') . '/webhook/twilio/taskrouter/assignment',
+                'assignmentCallbackUrl' => config('app.url').'/webhook/twilio/taskrouter/assignment',
                 'taskReservationTimeout' => 120,
             ]);
 

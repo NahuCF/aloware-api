@@ -14,9 +14,7 @@ use App\Services\WorkerService;
 
 class UserController extends Controller
 {
-    public function __construct(private WorkerService $workerService)
-    {
-    }
+    public function __construct(private WorkerService $workerService) {}
 
     public function index()
     {

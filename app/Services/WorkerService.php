@@ -8,6 +8,7 @@ use Twilio\Rest\Client;
 class WorkerService
 {
     private Client $client;
+
     private string $workspaceSid;
 
     public function __construct()

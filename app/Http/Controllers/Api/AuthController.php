@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-
 use App\Enums\UserRole;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
@@ -38,7 +37,7 @@ class AuthController extends Controller
         $user->languages()->sync($languageIds);
         $user->skills()->sync($skillIds);
 
-        $workerService = new WorkerService();
+        $workerService = new WorkerService;
         $workerService->createWorker($user);
 
         $token = $user->createToken('auth-token')->plainTextToken;
@@ -53,7 +52,7 @@ class AuthController extends Controller
         $email = data_get($input, 'email');
         $password = data_get($input, 'password');
 
-        if (!Auth::attempt(['email' => $email, 'password' => $password])) {
+        if (! Auth::attempt(['email' => $email, 'password' => $password])) {
             return response()->json([
                 'message' => 'Invalid credentials',
             ], 401);

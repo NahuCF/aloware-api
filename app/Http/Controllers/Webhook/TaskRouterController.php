@@ -30,7 +30,7 @@ class TaskRouterController extends Controller
 
         $response = [
             'instruction' => 'dequeue',
-            'to' => 'client:agent_' . $userId,
+            'to' => 'client:agent_'.$userId,
             'from' => config('services.twilio.phone_number'),
             'post_work_activity_sid' => config('services.twilio.activity_available_sid'),
         ];

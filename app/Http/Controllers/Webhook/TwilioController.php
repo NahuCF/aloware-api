@@ -23,7 +23,7 @@ class TwilioController extends Controller
 
         $line = Line::where('phone_number', $to)->first();
 
-        if (!$line) {
+        if (! $line) {
             return $this->errorResponse('Invalid number');
         }
 
@@ -50,13 +50,13 @@ class TwilioController extends Controller
 
         $session = CallSession::find($sessionId);
 
-        if (!$session) {
+        if (! $session) {
             return $this->errorResponse('Session not found');
         }
 
         $line = $session->line;
 
-        if (!$line) {
+        if (! $line) {
             return $this->errorResponse('Line not found');
         }
 
@@ -64,7 +64,7 @@ class TwilioController extends Controller
 
         $step = collect($currentSteps)->firstWhere('digit', $digit);
 
-        if (!$step) {
+        if (! $step) {
             return $this->playMenu($session, $currentSteps);
         }
 
@@ -87,13 +87,13 @@ class TwilioController extends Controller
 
     private function playMenu(CallSession $session, array $steps): \Illuminate\Http\Response
     {
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
 
         if (empty($session->path)) {
-            $response->say('Welcome to ' . config('app.name'));
+            $response->say('Welcome to '.config('app.name'));
         }
 
-        $handleInputUrl = '/webhook/twilio/voice/handle-input?session_id=' . $session->id;
+        $handleInputUrl = '/webhook/twilio/voice/handle-input?session_id='.$session->id;
 
         $gather = $response->gather([
             'numDigits' => 1,
@@ -117,7 +117,7 @@ class TwilioController extends Controller
 
         foreach ($path as $digit) {
             $step = collect($current)->firstWhere('digit', $digit);
-            if (!$step || empty($step['sub_steps'])) {
+            if (! $step || empty($step['sub_steps'])) {
                 return [];
             }
             $current = $step['sub_steps'];
@@ -130,7 +130,7 @@ class TwilioController extends Controller
     {
         $merged = $existing;
 
-        if (!empty($new['language_id'])) {
+        if (! empty($new['language_id'])) {
             $merged['language_id'] = $new['language_id'];
         }
 
@@ -147,7 +147,7 @@ class TwilioController extends Controller
         $skillIds = $context['skill_ids'] ?? [];
         $skillNames = Skill::whereIn('id', $skillIds)->pluck('name')->toArray();
 
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
 
         $enqueue = $response->enqueue(null, [
             'workflowSid' => config('services.twilio.workflow_sid'),
@@ -169,11 +169,11 @@ class TwilioController extends Controller
     {
         $user = User::find($userId);
 
-        if (!$user) {
+        if (! $user) {
             return $this->errorResponse('The requested agent is not available.');
         }
 
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
 
         $session->update(['status' => CallSessionStatus::Connected]);
 
@@ -182,10 +182,10 @@ class TwilioController extends Controller
         $dial = $response->dial(null, [
             'callerId' => $session->line->phone_number,
             'timeout' => 30,
-            'action' => '/webhook/twilio/voice/dial-complete?session_id=' . $session->id . '&user_id=' . $user->id,
+            'action' => '/webhook/twilio/voice/dial-complete?session_id='.$session->id.'&user_id='.$user->id,
         ]);
 
-        $dial->client('agent_' . $user->id);
+        $dial->client('agent_'.$user->id);
 
         return $this->twimlResponse($response);
     }
@@ -194,7 +194,7 @@ class TwilioController extends Controller
     {
         $line = Line::find($lineId);
 
-        if (!$line) {
+        if (! $line) {
             return $this->errorResponse('Transfer failed.');
         }
 
@@ -212,7 +212,7 @@ class TwilioController extends Controller
             'context' => [],
         ]);
 
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
         $response->say('Transferring your call.');
 
         return $this->playMenu($newSession, $line->ivr_steps);
@@ -223,11 +223,12 @@ class TwilioController extends Controller
         $input = $request->all();
         $to = data_get($input, 'To');
 
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
 
-        if (!$to) {
+        if (! $to) {
             $response->say('No destination number provided.');
             $response->hangup();
+
             return $this->twimlResponse($response);
         }
 
@@ -257,7 +258,7 @@ class TwilioController extends Controller
 
         CallSession::where('id', $sessionId)->update(['status' => CallSessionStatus::Completed]);
 
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
 
         if ($status !== 'completed') {
             $response->say('Agent could not pick up your call.');
@@ -270,7 +271,7 @@ class TwilioController extends Controller
 
     private function playStepPrompt($gather, array $step): void
     {
-        $gather->say('Press ' . $step['digit'] . ' for ' . $step['label'], ['voice' => 'Polly.Joanna']);
+        $gather->say('Press '.$step['digit'].' for '.$step['label'], ['voice' => 'Polly.Joanna']);
     }
 
     private function twimlResponse(VoiceResponse $response): \Illuminate\Http\Response
@@ -281,7 +282,7 @@ class TwilioController extends Controller
 
     private function errorResponse(string $message): \Illuminate\Http\Response
     {
-        $response = new VoiceResponse();
+        $response = new VoiceResponse;
         $response->say($message);
         $response->hangup();
 

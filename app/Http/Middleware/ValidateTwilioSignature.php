@@ -27,7 +27,7 @@ class ValidateTwilioSignature
         $url = $request->fullUrl();
         $params = $request->all();
 
-        if (!$validator->validate($signature, $url, $params)) {
+        if (! $validator->validate($signature, $url, $params)) {
             return response()->json(['message' => 'Invalid Twilio signature'], 403);
         }
 

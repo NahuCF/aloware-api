@@ -18,7 +18,7 @@ class VoiceController extends Controller
         $apiSecret = config('services.twilio.api_secret');
         $twimlAppSid = config('services.twilio.twiml_app_sid');
 
-        $identity = 'agent_' . $user->id;
+        $identity = 'agent_'.$user->id;
 
         $token = new AccessToken(
             $accountSid,
@@ -28,7 +28,7 @@ class VoiceController extends Controller
             $identity
         );
 
-        $voiceGrant = new VoiceGrant();
+        $voiceGrant = new VoiceGrant;
         $voiceGrant->setOutgoingApplicationSid($twimlAppSid);
         $voiceGrant->setIncomingAllow(true);
 
