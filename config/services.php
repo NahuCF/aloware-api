@@ -42,7 +42,10 @@ return [
         'api_key' => env('TWILIO_API_KEY'),
         'api_secret' => env('TWILIO_API_SECRET'),
         'twiml_app_sid' => env('TWILIO_TWIML_APP_SID'),
-        'validate_signature_locally' => env('TWILIO_VALIDATE_SIGNATURE_LOCALLY', false),
+        'workspace_sid' => env('TWILIO_WORKSPACE_SID'),
+        'workflow_sid' => env('TWILIO_WORKFLOW_SID'),
+        'activity_available_sid' => env('TWILIO_ACTIVITY_AVAILABLE_SID'),
+        'activity_offline_sid' => env('TWILIO_ACTIVITY_OFFLINE_SID'),
     ],
 
     'openai' => [
