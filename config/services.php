@@ -46,6 +46,12 @@ return [
         'workflow_sid' => env('TWILIO_WORKFLOW_SID'),
         'activity_available_sid' => env('TWILIO_ACTIVITY_AVAILABLE_SID'),
         'activity_offline_sid' => env('TWILIO_ACTIVITY_OFFLINE_SID'),
+
+        'ivr' => [
+            'gather_timeout' => env('TWILIO_IVR_GATHER_TIMEOUT', 5),
+            'dial_timeout' => env('TWILIO_IVR_DIAL_TIMEOUT', 30),
+            'hold_music_url' => env('TWILIO_IVR_HOLD_MUSIC_URL', 'http://twimlets.com/holdmusic?Bucket=com.twilio.music.soft-rock'),
+        ],
     ],
 
     'openai' => [

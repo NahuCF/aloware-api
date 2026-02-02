@@ -114,7 +114,7 @@ class TwilioController extends Controller
             'numDigits' => 1,
             'action' => $handleInputUrl,
             'method' => 'POST',
-            'timeout' => 5,
+            'timeout' => config('services.twilio.ivr.gather_timeout'),
         ]);
 
         foreach ($steps as $step) {
@@ -166,7 +166,7 @@ class TwilioController extends Controller
 
         $enqueue = $response->enqueue(null, [
             'workflowSid' => config('services.twilio.workflow_sid'),
-            'waitUrl' => 'http://twimlets.com/holdmusic?Bucket=com.twilio.music.soft-rock',
+            'waitUrl' => config('services.twilio.ivr.hold_music_url'),
         ]);
 
         $enqueue->task(json_encode([
@@ -201,7 +201,7 @@ class TwilioController extends Controller
 
         $dial = $response->dial(null, [
             'callerId' => $session->line->phone_number,
-            'timeout' => 30,
+            'timeout' => config('services.twilio.ivr.dial_timeout'),
             'action' => '/webhook/twilio/voice/dial-complete?session_id='.$session->id.'&user_id='.$user->id,
         ]);
 
@@ -273,7 +273,7 @@ class TwilioController extends Controller
 
         $dial = $response->dial(null, [
             'callerId' => config('services.twilio.phone_number'),
-            'timeout' => 30,
+            'timeout' => config('services.twilio.ivr.dial_timeout'),
         ]);
 
         $dial->number($to);
