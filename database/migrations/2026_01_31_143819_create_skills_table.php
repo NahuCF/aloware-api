@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('description')->nullable();
             $table->string('worker_sid')->nullable();
+            $table->string('queue_sid')->nullable();
             $table->timestamps();
         });
     }
