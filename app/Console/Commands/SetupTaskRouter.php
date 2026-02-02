@@ -49,7 +49,7 @@ class SetupTaskRouter extends Command
                 continue;
             }
 
-            $queue = $this->client->taskrouter
+            $queue = $this->client->taskrouter->v1
                 ->workspaces($this->workspaceSid)
                 ->taskQueues
                 ->create($skill->name, [
