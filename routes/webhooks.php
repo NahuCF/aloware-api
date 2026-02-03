@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Webhook\TaskRouterController;
 use App\Http\Controllers\Webhook\TwilioController;
+use App\Http\Controllers\Webhook\TwilioSmsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('twilio.signature')->prefix('twilio')->group(function () {
@@ -17,5 +18,10 @@ Route::middleware('twilio.signature')->prefix('twilio')->group(function () {
     Route::prefix('taskrouter')->group(function () {
         Route::post('/assignment', [TaskRouterController::class, 'assignment']);
         Route::post('/events', [TaskRouterController::class, 'events']);
+    });
+
+    Route::prefix('sms')->name('twilio.sms.')->group(function () {
+        Route::post('/incoming', [TwilioSmsController::class, 'incoming']);
+        Route::post('/status', [TwilioSmsController::class, 'status'])->name('status');
     });
 });

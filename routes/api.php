@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\LanguageController;
 use App\Http\Controllers\Api\LineController;
 use App\Http\Controllers\Api\SkillController;
+use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VoiceController;
 use Illuminate\Support\Facades\Route;
@@ -21,4 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/skills', [SkillController::class, 'index']);
 
     Route::get('/voice/token', [VoiceController::class, 'token']);
+
+    Route::get('/sms', [SmsController::class, 'index']);
+    Route::post('/sms', [SmsController::class, 'send']);
 });
